@@ -6,8 +6,11 @@ import type {
   Protocol,
   ProtocolField,
   SimulatedPacket,
+  TcpReassembleRequest,
+  TcpStreamScenario,
   TimelineEvent
 } from '../shared/types.js';
+import { buildCaptureSession, parseSegmentInputs, reassembleTcpStream, TCP_STREAM_SCENARIOS } from './tcpStream.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -180,6 +183,24 @@ app.post('/api/parse', (request: Request<unknown, unknown, Partial<ParseRequest>
   const raw = typeof request.body?.raw === 'string' ? request.body.raw : '';
   if (!raw.trim()) return response.status(400).json({ error: 'raw is required' });
   response.json({ data: buildPacket(protocol, scenario, raw) });
+});
+
+function isStreamScenario(value: unknown): value is TcpStreamScenario {
+  return TCP_STREAM_SCENARIOS.includes(value as TcpStreamScenario);
+}
+
+app.get('/api/tcp/session', (request, response) => {
+  const scenario = isStreamScenario(request.query.scenario) ? request.query.scenario : 'textbook';
+  response.json({ data: buildCaptureSession(scenario) });
+});
+
+app.post('/api/tcp/reassemble', (request: Request<unknown, unknown, Partial<TcpReassembleRequest>>, response: Response) => {
+  try {
+    const segments = parseSegmentInputs(request.body);
+    response.json({ data: reassembleTcpStream(segments) });
+  } catch (cause) {
+    response.status(400).json({ error: cause instanceof Error ? cause.message : '段数据无法重建' });
+  }
 });
 
 app.listen(port, () => {

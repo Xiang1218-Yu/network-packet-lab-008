@@ -36,7 +36,8 @@ network-packet-lab/
 3. **协议字段树**：HTTP 展示起始行、Header、Payload；TCP 展示 Ethernet、IPv4、TCP 和 Payload 层级，并支持折叠。
 4. **十六进制视图**：以 offset、hex bytes、ASCII 三列展示当前 payload 的 UTF-8 字节。
 5. **传输时间线**：展示抓包、解析、传输层解码和结构化输出等阶段。
-6. **解析 API / 模拟数据 API**：Express 服务提供 `/api/parse`、`/api/simulate`、`/api/packets` 和 `/api/health`。
+6. **TCP 流重建面板**：从捕获会话中勾选多个 TCP 段，服务端按连接与方向拆分后重建逻辑字节流——按到达顺序识别重传、重复段、部分重叠与缺口，按序号空间展示每段的流范围、字节流地图与 ACK 覆盖进度，并处理乱序输入、空选择、混合连接与序号回绕。
+7. **解析 API / 模拟数据 API**：Express 服务提供 `/api/parse`、`/api/simulate`、`/api/packets`、`/api/tcp/session`、`/api/tcp/reassemble` 和 `/api/health`。
 
 ## 启动方式
 
@@ -93,6 +94,26 @@ curl -X POST 'http://localhost:3001/api/parse' \
 ```bash
 curl 'http://localhost:3001/api/packets?protocol=TCP'
 ```
+
+### 获取 TCP 捕获会话（流重建教学样例）
+
+```bash
+# scenario: textbook（有序）/ lossy（丢包重传）/ wrap（序号回绕）/ mixed（混合连接）
+curl 'http://localhost:3001/api/tcp/session?scenario=lossy'
+```
+
+### 重建 TCP 字节流
+
+```bash
+curl -X POST 'http://localhost:3001/api/tcp/reassemble' \
+  -H 'Content-Type: application/json' \
+  -d '{"segments":[
+    {"source":"10.0.0.24:51842","destination":"10.0.0.8:443","seq":1601,"ack":5001,"flags":["ACK","PSH"],"payloadLength":300,"capturedAt":"00:00:02.125"},
+    {"source":"10.0.0.24:51842","destination":"10.0.0.8:443","seq":1001,"ack":5001,"flags":["ACK","PSH"],"payloadLength":300,"capturedAt":"00:00:02.120"}
+  ]}'
+```
+
+返回按连接 / 方向拆分的关系数据：每段的流范围 `[rangeStart, rangeEnd)`、状态（按序 / 乱序到达 / 完整重传 / 重复段 / 部分重叠 / 控制段）、缺口与重叠区、方向切换次数、ACK 覆盖进度，以及混合连接、序号回绕等警告。空选择或非法序号会返回 `400` 与中文错误说明。
 
 ## 说明
 
