@@ -8,6 +8,7 @@ import type {
   SimulatedPacket,
   TimelineEvent
 } from '../shared/types.js';
+import { buildCaptureSession, isCaptureScenario, reassembleTcpStream } from './tcp-stream.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
@@ -180,6 +181,17 @@ app.post('/api/parse', (request: Request<unknown, unknown, Partial<ParseRequest>
   const raw = typeof request.body?.raw === 'string' ? request.body.raw : '';
   if (!raw.trim()) return response.status(400).json({ error: 'raw is required' });
   response.json({ data: buildPacket(protocol, scenario, raw) });
+});
+
+app.get('/api/capture-session', (request, response) => {
+  const scenario = isCaptureScenario(request.query.scenario) ? request.query.scenario : 'standard';
+  response.json({ data: buildCaptureSession(scenario) });
+});
+
+app.post('/api/tcp-stream/reassemble', (request: Request<unknown, unknown, { segments?: unknown }>, response: Response) => {
+  const result = reassembleTcpStream(request.body?.segments);
+  if ('error' in result) return response.status(400).json({ error: result.error });
+  response.json({ data: result.data });
 });
 
 app.listen(port, () => {

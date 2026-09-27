@@ -16,10 +16,12 @@ network-packet-lab/
 │   ├── index.html
 │   └── src/
 │       ├── App.tsx
+│       ├── TcpStreamPanel.tsx
 │       ├── main.tsx
 │       └── styles.css
 ├── server/
-│   └── index.ts
+│   ├── index.ts
+│   └── tcp-stream.ts
 ├── shared/
 │   └── types.ts
 ├── package.json
@@ -36,7 +38,8 @@ network-packet-lab/
 3. **协议字段树**：HTTP 展示起始行、Header、Payload；TCP 展示 Ethernet、IPv4、TCP 和 Payload 层级，并支持折叠。
 4. **十六进制视图**：以 offset、hex bytes、ASCII 三列展示当前 payload 的 UTF-8 字节。
 5. **传输时间线**：展示抓包、解析、传输层解码和结构化输出等阶段。
-6. **解析 API / 模拟数据 API**：Express 服务提供 `/api/parse`、`/api/simulate`、`/api/packets` 和 `/api/health`。
+6. **TCP 流重建**：从捕获会话中勾选多个 TCP 段，服务端按连接分组、分离双向字节流，以 SYN（ISN+1）或推断值为基准序号，按 RFC 1982 模 2^32 算术把每个段映射到逻辑字节流区间，识别重传、缺口、重叠、重复 ACK 与方向切换，并解读每个 ACK 是否覆盖对端已发送的数据；前端提供字节流区间图、流内排序表、事件流，以及混用连接、空选择、序号回绕的提示。
+7. **解析 API / 模拟数据 API**：Express 服务提供 `/api/parse`、`/api/simulate`、`/api/packets`、`/api/capture-session`、`/api/tcp-stream/reassemble` 和 `/api/health`。
 
 ## 启动方式
 
@@ -93,6 +96,23 @@ curl -X POST 'http://localhost:3001/api/parse' \
 ```bash
 curl 'http://localhost:3001/api/packets?protocol=TCP'
 ```
+
+### 获取捕获会话（TCP 流重建）
+
+```bash
+# scenario: standard | loss | wraparound | mixed
+curl 'http://localhost:3001/api/capture-session?scenario=loss'
+```
+
+### 重建 TCP 流
+
+```bash
+curl -X POST 'http://localhost:3001/api/tcp-stream/reassemble' \
+  -H 'Content-Type: application/json' \
+  -d '{"segments":[{"id":"seg-01","source":"10.0.0.24:51842","destination":"10.0.0.8:443","seq":5000,"ack":0,"flags":["SYN"],"payloadLength":0}]}'
+```
+
+响应包含：连接端点与方向划分、每个方向的基准序号与覆盖统计、每个段在逻辑字节流中的 `[start, end)` 区间与异常标记（重传 / 缺口 / 重叠 / 重复 ACK / 回绕可疑）、ACK 覆盖解读、按捕获顺序排列的事件流，以及混用连接被排除的段与告警。
 
 ## 说明
 

@@ -7,6 +7,7 @@ import type {
   SimulatedPacket,
   TimelineEvent
 } from '../../shared/types';
+import { TcpStreamPanel } from './TcpStreamPanel';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001';
 
@@ -163,6 +164,8 @@ function App() {
             </div>
           </div>
         </section>
+
+        <TcpStreamPanel />
       </main>
       <footer className="footer"><span>PACKET LAB / EDUCATIONAL SIMULATOR</span><span>React + Vite + TypeScript · Express API</span></footer>
     </div>
